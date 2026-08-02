@@ -26,6 +26,7 @@ export type Photo = {
   id: number;
   url: string;
   is_primary?: boolean;
+  sort_order?: number;
   moderation_status?: string;
 };
 

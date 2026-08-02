@@ -54,7 +54,28 @@ function PageHeader({ title, body, action }: { title: string; body?: string; act
 }
 
 function getPrimaryPhoto(profile: Profile) {
-  return profile.photos?.find((photo) => photo.is_primary)?.url ?? profile.photos?.[0]?.url ?? null;
+  const photos = getProfilePhotos(profile);
+  return photos.find((photo) => photo.is_primary)?.url ?? photos[0]?.url ?? null;
+}
+
+function getProfilePhotos(profile: Profile) {
+  return [...(profile.photos ?? [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+}
+
+function ProfilePhotoStrip({ profile, name, limit = 4 }: { profile: Profile; name: string; limit?: number }) {
+  const photos = getProfilePhotos(profile);
+  if (photos.length === 0) return null;
+
+  return (
+    <div className="mt-3 grid grid-cols-4 gap-2">
+      {photos.slice(0, limit).map((photo, index) => (
+        <div key={photo.id} className="relative aspect-square overflow-hidden rounded-2xl bg-white/10">
+          <Image src={photo.url} alt={`${name} photo ${index + 1}`} fill sizes="96px" className="object-cover" />
+          {photo.is_primary ? <span className="absolute left-1 top-1 rounded-full bg-black/45 px-1.5 py-0.5 text-[9px] font-black text-white">1</span> : null}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function dataOf<T>(result: { data: T[] } | null | undefined) {
@@ -75,7 +96,7 @@ export function DiscoveryView() {
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
   const current = profiles[index];
-  const currentPhotos = current?.photos ?? [];
+  const currentPhotos = current ? getProfilePhotos(current) : [];
   const activePhoto = currentPhotos[photoIndex]?.url ?? (current ? getPrimaryPhoto(current) : null);
 
   useEffect(() => {
@@ -203,6 +224,7 @@ export function DiscoveryView() {
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.05em] text-[var(--gold)]">Photos</p>
                     <p className="mt-2 text-sm text-[var(--muted)]">{currentPhotos.length} photo(s) disponibles.</p>
+                    <ProfilePhotoStrip profile={current} name={current.first_name} />
                   </div>
                 </div>
               ) : null}
@@ -299,6 +321,7 @@ export function LikesView() {
                   <h2 className="text-xl font-black text-white">{profile?.first_name ?? item.other_user?.name ?? "Profil"}, {profile?.age ?? "18+"}</h2>
                   <p className="mt-1 text-sm text-[var(--muted)]">{profile?.university?.name ?? "Universite non renseignee"}</p>
                   <div className="mt-3 flex flex-wrap gap-2">{(profile?.interests ?? []).slice(0, 3).map((interest) => <span key={interest} className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">{interest}</span>)}</div>
+                  {profile ? <ProfilePhotoStrip profile={profile} name={profile.first_name ?? "Profil"} /> : null}
                   {tab === "received" ? <Button className="mt-4 w-full" onClick={() => profile?.user_id && api.like(profile.user_id)}>Apprecier aussi</Button> : null}
                 </div>
               </article>
@@ -342,7 +365,7 @@ export function MatchesView() {
 
   const profile = active?.matched_user?.profile ?? null;
   const primaryPhoto = profile ? getPrimaryPhoto(profile) : null;
-  const photos = profile?.photos ?? [];
+  const photos = profile ? getProfilePhotos(profile) : [];
 
   return (
     <section>
@@ -414,6 +437,7 @@ export function MatchesView() {
                     <h3 className="font-black text-white">Centres d&apos;interet</h3>
                     <div className="mt-3 flex flex-wrap gap-2">{(profile.interests ?? []).map((item) => <span key={item} className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">{item}</span>)}</div>
                     {(active.compatibility?.shared_interests ?? []).length ? <p className="mt-3 text-xs text-[#bbf7d0]">{active.compatibility?.shared_interests?.join(", ")} en commun.</p> : null}
+                    <ProfilePhotoStrip profile={profile} name={profile.first_name} limit={8} />
                   </section>
                   {photos.length > 1 ? (
                     <section>
@@ -852,6 +876,7 @@ export function ProfileView() {
 
   if (loading) return <ProfileSkeleton />;
   if (!profile) return <EmptyState title="Profil introuvable" body="Aucun profil n'a ete retourne par la base de donnees." />;
+  const profilePhotos = getProfilePhotos(profile);
 
   return (
     <section>
@@ -872,6 +897,23 @@ export function ProfileView() {
               ))}
             </div>
           ) : null}
+          {profilePhotos.length > 0 ? (
+            <div className="mt-4 rounded-[22px] border border-white/10 bg-white/5 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-black uppercase tracking-[0.05em] text-[var(--gold)]">Galerie</p>
+                <span className="text-xs font-bold text-[var(--muted)]">{profilePhotos.length}/6 photos</span>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {profilePhotos.map((photo, index) => (
+                  <div key={photo.id} className="relative aspect-square overflow-hidden rounded-2xl bg-white/10">
+                    <Image src={photo.url} alt={`${profile.first_name} photo ${index + 1}`} fill sizes="96px" className="object-cover" />
+                    {photo.is_primary ? <span className="absolute left-1 top-1 rounded-full bg-[var(--primary)] px-1.5 py-0.5 text-[9px] font-black text-white">Principale</span> : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {profilePhotos.length < 2 ? <div className="mt-3"><Notice kind="error">Ajoutez au moins 2 photos pour un profil complet.</Notice></div> : null}
           <Field label="Photos locales" icon={<Camera size={18} />}>
             <TextInput type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => choosePhotos(e.target.files)} />
           </Field>

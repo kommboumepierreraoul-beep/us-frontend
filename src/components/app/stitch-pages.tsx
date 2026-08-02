@@ -290,7 +290,8 @@ export function OnboardingStepPage({ step }: { step: OnboardingStep }) {
   };
   const data = steps[step];
   const Icon = data.icon;
-  const primaryPhoto = profile?.photos?.find((photo) => photo.is_primary)?.url ?? profile?.photos?.[0]?.url ?? null;
+  const profilePhotos = [...(profile?.photos ?? [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const primaryPhoto = profilePhotos.find((photo) => photo.is_primary)?.url ?? profilePhotos[0]?.url ?? null;
 
   useEffect(() => {
     Promise.all([
@@ -349,7 +350,7 @@ export function OnboardingStepPage({ step }: { step: OnboardingStep }) {
 
   async function savePhoto(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if ((profile?.photos?.length ?? 0) + selectedPhotos.length < 2) {
+    if (profilePhotos.length + selectedPhotos.length < 2) {
       setNotice("Ajoutez au moins 2 photos pour activer la decouverte.");
       return;
     }
@@ -413,10 +414,25 @@ export function OnboardingStepPage({ step }: { step: OnboardingStep }) {
                   ))}
                 </div>
               ) : null}
+              {profilePhotos.length > 0 ? (
+                <div className="rounded-[22px] border border-white/10 bg-white/5 p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-black uppercase tracking-[0.05em] text-[var(--gold)]">Photos existantes</p>
+                    <span className="text-xs text-[var(--muted)]">{profilePhotos.length}/6</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {profilePhotos.map((photo, index) => (
+                      <div key={photo.id} className="relative aspect-square overflow-hidden rounded-2xl bg-white/10">
+                        <Image src={photo.url} alt={`Photo profil ${index + 1}`} fill sizes="80px" className="object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <Field label="Photos locales"><TextInput type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => choosePhotos(e.target.files)} /></Field>
               <Button type="submit" disabled={saving}><Camera size={18} /> Ajouter les photos</Button>
               <Button type="button" variant="secondary" onClick={() => {
-                if ((profile?.photos?.length ?? 0) < 2) {
+                if (profilePhotos.length < 2) {
                   setNotice("Ajoutez au moins 2 photos pour continuer.");
                   return;
                 }
@@ -467,7 +483,7 @@ export function OnboardingStepPage({ step }: { step: OnboardingStep }) {
                 <div className="mt-4 h-2 rounded-full bg-white/10">
                   <div className="h-2 rounded-full bg-[var(--gold)]" style={{ width: `${profile?.completion_score ?? 0}%` }} />
                 </div>
-                <p className="mt-4 text-sm text-[var(--muted)]">{profile?.photos?.length ?? 0} photo(s), {(profile?.interests ?? []).length} centre(s) d&apos;interet.</p>
+                <p className="mt-4 text-sm text-[var(--muted)]">{profilePhotos.length} photo(s), {(profile?.interests ?? []).length} centre(s) d&apos;interet.</p>
               </div>
             ) : null}
             <Button type="submit" disabled={saving}>{step === "complete" ? "Entrer dans US" : "Enregistrer et continuer"} <ArrowRight size={18} /></Button>
