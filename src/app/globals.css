@@ -1,8 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0f0b16;
+  --foreground: #ffffff;
+  --surface: #15101f;
+  --surface-low: #1b1424;
+  --surface-elevated: #24182f;
+  --surface-card: rgba(255, 255, 255, 0.06);
+  --surface-card-strong: rgba(255, 255, 255, 0.1);
+  --outline: rgba(255, 255, 255, 0.12);
+  --primary: #d7263d;
+  --pink: #ec4899;
+  --primary-soft: #ffb4c2;
+  --secondary: #6c2bd9;
+  --secondary-soft: #d2bcff;
+  --gold: #d4af37;
+  --muted: #b9b4c4;
+  --text-dark: #1f1f2e;
+  --text-soft: #6b6778;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #dc2626;
 }
 
 @theme inline {
@@ -12,15 +30,81 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
+  background: linear-gradient(180deg, #15101f 0%, #100c1a 48%, #0f0b16 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Inter, var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-display {
+  font-family: Poppins, Inter, var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.glass {
+  background: var(--surface-card);
+  border: 1px solid var(--outline);
+  backdrop-filter: blur(20px);
+}
+
+.glass-strong {
+  background: var(--surface-card-strong);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(24px);
+}
+
+.primary-gradient {
+  background: linear-gradient(135deg, #d7263d 0%, #ec4899 52%, #6c2bd9 100%);
+}
+
+.premium-gradient {
+  background: linear-gradient(135deg, #6c2bd9 0%, #d4af37 100%);
+}
+
+.dark-premium-gradient {
+  background: linear-gradient(135deg, #15101f 0%, #2b123f 100%);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #ffb4c2 0%, #ec4899 45%, #d2bcff 100%);
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.text-premium {
+  background: linear-gradient(135deg, #d2bcff 0%, #d4af37 100%);
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
