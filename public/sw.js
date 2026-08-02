@@ -9,8 +9,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "US Nous";
   const options = {
     body: payload.body || "Vous avez une nouvelle notification.",
-    icon: "/us-logo.png",
-    badge: "/us-logo.png",
+    icon: "/android-chrome-192x192.png",
+    badge: "/favicon-32x32.png",
     data: {
       url: payload.url || "/dashboard/notifications",
       notificationId: payload.notification_id,
