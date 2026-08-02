@@ -15,6 +15,7 @@ import {
   Coffee,
   Crown,
   Dumbbell,
+  Eye,
   FileText,
   Film,
   Gamepad2,
@@ -27,6 +28,7 @@ import {
   Plane,
   QrCode,
   Shield,
+  ShieldCheck,
   Sparkles,
   Star,
   Ticket,
@@ -37,7 +39,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/services/api";
 import type { EventInvitation, EventItem, Plan, Profile, University, VerificationRequest } from "@/types/api";
 import { BrandMark } from "@/components/ui/brand";
-import { Button, EmptyState, Field, Notice, Select, Spinner, TextArea, TextInput } from "@/components/ui/primitives";
+import { Badge, Button, EmptyState, Field, Notice, Select, Spinner, TextArea, TextInput, Toggle } from "@/components/ui/primitives";
 import {
   CompactPlanSkeleton,
   EventDetailsSkeleton,
@@ -46,6 +48,43 @@ import {
   OnboardingStepSkeleton,
   TicketSkeleton,
 } from "@/components/ui/skeletons";
+
+const PROFILE_PHOTO_LIMIT = 10;
+
+function VerificationStatusBadge({ status }: { status?: VerificationRequest["status"] }) {
+  if (!status) return <Badge>Non envoye</Badge>;
+  const labels = { pending: "En attente", approved: "Approuvee", rejected: "Refusee" };
+  const tones = { pending: "gold", approved: "success", rejected: "danger" } as const;
+  return <Badge tone={tones[status]}>{labels[status]}</Badge>;
+}
+
+function accountVerificationState(items: VerificationRequest[]) {
+  if (items.some((item) => item.status === "approved")) {
+    return {
+      label: "Compte verifie",
+      body: "Votre compte dispose d'une verification approuvee. Le badge Verifie peut apparaitre sur votre profil.",
+      className: "border-[#22c55e]/35 bg-[#22c55e]/12 text-[#bbf7d0]",
+      iconClassName: "bg-[#22c55e]/20 text-[#bbf7d0]",
+      status: "verifie",
+    };
+  }
+  if (items.some((item) => item.status === "pending")) {
+    return {
+      label: "Verification en attente",
+      body: "Votre demande est envoyee. L'equipe US doit encore valider les elements fournis.",
+      className: "border-[#d4af37]/35 bg-[#d4af37]/12 text-[#ffe088]",
+      iconClassName: "bg-[#d4af37]/20 text-[#ffe088]",
+      status: "pending",
+    };
+  }
+  return {
+    label: "Compte non verifie",
+    body: "Envoyez au moins un element de verification pour obtenir le badge Verifie apres validation.",
+    className: "border-white/10 bg-white/5 text-white",
+    iconClassName: "bg-white/10 text-[var(--muted)]",
+    status: "none",
+  };
+}
 
 function errorMessage(error: unknown) {
   if (error instanceof ApiError) return error.message;
@@ -309,7 +348,14 @@ export function OnboardingStepPage({ step }: { step: OnboardingStep }) {
 
   function choosePhotos(files: FileList | null) {
     photoPreviews.forEach((preview) => URL.revokeObjectURL(preview));
-    const images = Array.from(files ?? []).slice(0, 6);
+    const availableSlots = Math.max(0, PROFILE_PHOTO_LIMIT - profilePhotos.length);
+    if (availableSlots === 0) {
+      setSelectedPhotos([]);
+      setPhotoPreviews([]);
+      setNotice(`Votre galerie contient deja ${PROFILE_PHOTO_LIMIT} photos.`);
+      return;
+    }
+    const images = Array.from(files ?? []).slice(0, availableSlots);
     setSelectedPhotos(images);
     setPhotoPreviews(images.map((file) => URL.createObjectURL(file)));
   }
@@ -418,7 +464,7 @@ export function OnboardingStepPage({ step }: { step: OnboardingStep }) {
                 <div className="rounded-[22px] border border-white/10 bg-white/5 p-3">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-black uppercase tracking-[0.05em] text-[var(--gold)]">Photos existantes</p>
-                    <span className="text-xs text-[var(--muted)]">{profilePhotos.length}/6</span>
+                    <span className="text-xs text-[var(--muted)]">{profilePhotos.length}/{PROFILE_PHOTO_LIMIT}</span>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2">
                     {profilePhotos.map((photo, index) => (
@@ -716,6 +762,8 @@ export function VerificationCenterPage() {
   const [items, setItems] = useState<VerificationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const selfie = items.find((item) => item.type === "selfie");
+  const identity = items.find((item) => item.type === "identity" || item.type === "student");
+  const accountState = accountVerificationState(items);
 
   useEffect(() => {
     api.verificationStatus()
@@ -726,11 +774,51 @@ export function VerificationCenterPage() {
 
   return (
     <PageShell title="Verification">
-      <Notice>Les documents et selfies sont confidentiels. Les autres utilisateurs ne voient jamais ces fichiers.</Notice>
+      <section className={`rounded-[28px] border p-5 ${accountState.className}`}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`grid h-16 w-16 shrink-0 place-items-center rounded-[22px] ${accountState.iconClassName}`}>
+              {accountState.status === "verifie" ? <BadgeCheck size={30} /> : accountState.status === "pending" ? <Shield size={30} /> : <Lock size={30} />}
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.08em] opacity-75">Statut du compte</p>
+              <h1 className="mt-1 text-2xl font-black text-white">{accountState.label}</h1>
+              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{accountState.body}</p>
+            </div>
+          </div>
+          <div className="rounded-2xl bg-black/15 px-4 py-3 text-center">
+            <p className="text-3xl font-black text-white">{items.filter((item) => item.status === "approved").length}/{Math.max(2, items.length || 2)}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.05em] opacity-75">elements OK</p>
+          </div>
+        </div>
+      </section>
+      <div className="mt-4">
+        <Notice>Les documents et selfies sont confidentiels. Les autres utilisateurs ne voient jamais ces fichiers.</Notice>
+      </div>
       {loading ? <div className="mt-4"><Spinner label="Chargement du statut..." /></div> : null}
       <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <Link href="/dashboard/verification/selfie" className="glass rounded-[24px] p-6 text-white"><Camera className="text-[var(--primary-soft)]" /><h2 className="mt-4 font-black">Selfie de verification</h2><p className="mt-2 text-sm text-[var(--muted)]">{selfie ? `Statut: ${selfie.status}` : "Capture faciale guidee."}</p></Link>
-        <Link href="/dashboard/verification/document" className="glass rounded-[24px] p-6 text-white"><FileText className="text-[var(--gold)]" /><h2 className="mt-4 font-black">Choix du document</h2><p className="mt-2 text-sm text-[var(--muted)]">Carte nationale, passeport ou carte etudiante.</p></Link>
+        <Link href="/dashboard/verification/selfie" className={`glass rounded-[24px] border p-6 text-white transition hover:bg-white/10 ${selfie?.status === "approved" ? "border-[#22c55e]/30" : selfie?.status === "rejected" ? "border-[#dc2626]/30" : "border-[#d4af37]/20"}`}>
+          <div className="flex items-start justify-between gap-3">
+            <Camera className="text-[var(--primary-soft)]" />
+            <VerificationStatusBadge status={selfie?.status} />
+          </div>
+          <h2 className="mt-4 font-black">Selfie de verification</h2>
+          <p className="mt-2 text-sm text-[var(--muted)]">{selfie?.rejection_reason ?? (selfie ? `Derniere mise a jour: ${selfie.reviewed_at ? new Date(selfie.reviewed_at).toLocaleDateString("fr-FR") : "en cours"}` : "Capture faciale guidee.")}</p>
+          <div className="mt-5 inline-flex rounded-2xl bg-[var(--primary)] px-4 py-3 text-sm font-black text-white">
+            {selfie ? "Voir ou renvoyer le selfie" : "Envoyer un selfie"}
+          </div>
+        </Link>
+        <Link href="/dashboard/verification/document" className={`glass rounded-[24px] border p-6 text-white transition hover:bg-white/10 ${identity?.status === "approved" ? "border-[#22c55e]/30" : identity?.status === "rejected" ? "border-[#dc2626]/30" : "border-white/10"}`}>
+          <div className="flex items-start justify-between gap-3">
+            <FileText className="text-[var(--gold)]" />
+            <VerificationStatusBadge status={identity?.status} />
+          </div>
+          <h2 className="mt-4 font-black">Choix du document</h2>
+          <p className="mt-2 text-sm text-[var(--muted)]">Carte nationale, passeport ou carte etudiante.</p>
+          <div className="mt-5 inline-flex rounded-2xl bg-white/10 px-4 py-3 text-sm font-black text-white">
+            {identity ? "Voir ou renvoyer le document" : "Envoyer un document"}
+          </div>
+        </Link>
       </div>
     </PageShell>
   );
@@ -808,28 +896,57 @@ export function VerificationSelfiePage() {
 
   return (
     <PageShell title="Selfie" back="/dashboard/verification">
-      <div className="glass mx-auto max-w-2xl rounded-[32px] p-6">
-        <h1 className="text-2xl font-black text-white">Selfie de verification</h1>
-        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Votre selfie sert uniquement a verifier que le compte represente une personne reelle. Il n&apos;est pas visible par les autres utilisateurs.</p>
-        {notice ? <div className="mt-4"><Notice kind={notice.includes("envoye") ? "success" : "error"}>{notice}</Notice></div> : null}
-        <div className="mt-5 overflow-hidden rounded-[28px] border border-white/10 bg-white/5">
-          {preview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview} alt="Selfie capture" className="aspect-[4/5] w-full object-cover" />
-          ) : (
-            <video ref={videoRef} playsInline muted className="aspect-[4/5] w-full bg-[#0f0b16] object-cover" />
-          )}
-          <canvas ref={canvasRef} className="hidden" />
-        </div>
-        <label className="mt-5 flex gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-[var(--muted)]">
-          <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 h-5 w-5 accent-[#d7263d]" />
-          J&apos;accepte que ce selfie soit envoye a US pour verification confidentielle. Les autres utilisateurs ne pourront pas le consulter.
-        </label>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <Button type="button" variant="secondary" onClick={startCamera}>Ouvrir camera</Button>
-          <Button type="button" variant="secondary" onClick={capture}>Capturer</Button>
-          <Button type="button" disabled={loading} onClick={submit}>{loading ? "Envoi..." : "Envoyer"}</Button>
-        </div>
+      <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[1fr_360px]">
+        <section className="glass rounded-[32px] p-5">
+          <div className="flex items-start gap-4">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl primary-gradient"><Camera size={26} className="text-white" /></div>
+            <div>
+              <h1 className="text-2xl font-black text-white">Selfie de verification</h1>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Cadrez votre visage, capturez une image nette, puis envoyez-la pour moderation confidentielle.</p>
+            </div>
+          </div>
+          {notice ? <div className="mt-4"><Notice kind={notice.includes("envoye") ? "success" : "error"}>{notice}</Notice></div> : null}
+          <div className="mt-5 overflow-hidden rounded-[28px] border border-white/10 bg-[#0f0b16]">
+            <div className="relative">
+              {preview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview} alt="Selfie capture" className="aspect-[4/5] w-full object-cover" />
+              ) : (
+                <video ref={videoRef} playsInline muted className="aspect-[4/5] w-full object-cover" />
+              )}
+              <div className="pointer-events-none absolute inset-5 rounded-[28px] border-2 border-white/25" />
+              <div className="pointer-events-none absolute left-1/2 top-1/2 h-[58%] w-[62%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border border-[#d4af37]/60" />
+            </div>
+            <canvas ref={canvasRef} className="hidden" />
+          </div>
+          <div className="mt-5">
+            <Toggle checked={consent} onChange={setConsent} label="J'accepte que ce selfie soit envoye a US pour verification confidentielle." />
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Les autres utilisateurs ne pourront pas le consulter.</p>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <Button type="button" variant="secondary" onClick={startCamera}><Eye size={18} /> Ouvrir camera</Button>
+            <Button type="button" variant="secondary" onClick={capture}><Camera size={18} /> Capturer</Button>
+            <Button type="button" disabled={loading} onClick={submit}>{loading ? "Envoi..." : <><ShieldCheck size={18} /> Envoyer</>}</Button>
+          </div>
+        </section>
+        <aside className="glass h-max rounded-[28px] p-5">
+          <h2 className="text-xl font-black text-white">Controle qualite</h2>
+          <div className="mt-5 space-y-3">
+            {[
+              ["Visage visible", "Regardez la camera, visage entier dans l'ovale.", Camera],
+              ["Image nette", "Evitez le flou, les filtres et les lunettes sombres.", Eye],
+              ["Verification privee", "Le selfie sert uniquement a la moderation US.", ShieldCheck],
+            ].map(([title, body, Icon]) => {
+              const StepIcon = Icon as typeof Camera;
+              return (
+                <div key={title as string} className="flex gap-3 rounded-2xl bg-white/5 p-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-[var(--gold)]"><StepIcon size={18} /></span>
+                  <span><b className="block text-sm text-white">{title as string}</b><small className="mt-1 block leading-5 text-[var(--muted)]">{body as string}</small></span>
+                </div>
+              );
+            })}
+          </div>
+        </aside>
       </div>
     </PageShell>
   );
@@ -865,6 +982,8 @@ export function VerificationApprovedPage() {
 }
 
 export function SettingsPremiumPage() {
+  const [options, setOptions] = useState<Record<string, boolean>>({});
+
   return (
     <PageShell title="Reglages premium" back="/dashboard/settings">
       <div className="glass max-w-2xl rounded-[28px] p-6">
@@ -872,10 +991,7 @@ export function SettingsPremiumPage() {
         <p className="mt-2 text-sm text-[var(--muted)]">Ces options seront synchronisees avec les abonnements presents en base.</p>
         <div className="mt-6 space-y-3">
           {["Mode invisible", "Masquer la distance floutee", "Recevoir les invitations club"].map((item) => (
-            <label key={item} className="flex items-center justify-between rounded-2xl bg-white/5 p-4 text-sm font-bold text-white">
-              {item}
-              <input type="checkbox" className="h-5 w-5 accent-[#d7263d]" />
-            </label>
+            <Toggle key={item} checked={!!options[item]} onChange={(checked) => setOptions({ ...options, [item]: checked })} label={item} />
           ))}
         </div>
       </div>

@@ -64,6 +64,24 @@ button {
   cursor: pointer;
 }
 
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
 .glass {
   background: var(--surface-card);
   border: 1px solid var(--outline);
@@ -107,4 +125,19 @@ button {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@media (max-width: 640px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  input[type="file"] {
+    font-size: 12px;
+  }
+
+  .glass,
+  .glass-strong {
+    backdrop-filter: blur(16px);
+  }
 }

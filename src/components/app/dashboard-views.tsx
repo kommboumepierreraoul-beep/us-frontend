@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import EmojiPicker, { EmojiStyle, Theme, type EmojiClickData } from "emoji-picker-react";
 import {
   ArrowLeft,
+  BadgeCheck,
   Bell,
   Camera,
   ChevronLeft,
@@ -16,6 +17,7 @@ import {
   GraduationCap,
   Heart,
   MapPin,
+  Maximize2,
   MessageCircle,
   Navigation,
   Reply,
@@ -28,8 +30,8 @@ import {
 } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { api, ApiError, getStoredUser } from "@/services/api";
-import type { Conversation, DiscoveryPreference, LikeItem, Match, Message, NotificationItem, Plan, Profile, University } from "@/types/api";
-import { Button, EmptyState, Field, Notice, Select, Spinner, TextArea, TextInput } from "@/components/ui/primitives";
+import type { Conversation, DiscoveryPreference, LikeItem, Match, Message, NotificationItem, Photo, Plan, Profile, University } from "@/types/api";
+import { Button, EmptyState, Field, Notice, Select, Spinner, TextArea, TextInput, Toggle } from "@/components/ui/primitives";
 import {
   DiscoverySkeleton,
   LikesSkeleton,
@@ -42,13 +44,15 @@ import {
 
 function PageHeader({ title, body, action }: { title: string; body?: string; action?: React.ReactNode }) {
   return (
-    <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.05em] text-[var(--gold)]">US Nous</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-white md:text-4xl">{title}</h1>
-        {body ? <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{body}</p> : null}
+    <div className="mb-4 rounded-[20px] border border-white/10 bg-white/[0.04] p-4 sm:mb-6 sm:rounded-[24px] sm:p-5">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.05em] text-[var(--gold)]">US Nous</p>
+          <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl md:text-4xl">{title}</h1>
+          {body ? <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">{body}</p> : null}
+        </div>
+        {action ? <div className="shrink-0 [&_a]:w-full [&_button]:w-full sm:[&_a]:w-auto sm:[&_button]:w-auto">{action}</div> : null}
       </div>
-      {action}
     </div>
   );
 }
@@ -62,19 +66,73 @@ function getProfilePhotos(profile: Profile) {
   return [...(profile.photos ?? [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 }
 
-function ProfilePhotoStrip({ profile, name, limit = 4 }: { profile: Profile; name: string; limit?: number }) {
-  const photos = getProfilePhotos(profile);
-  if (photos.length === 0) return null;
+const PROFILE_PHOTO_LIMIT = 10;
+
+function VerifiedBadge({ profile, compact = false }: { profile?: Profile | null; compact?: boolean }) {
+  if (profile?.is_certified) {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full border border-[#d4af37]/45 bg-[#d4af37]/20 font-black text-[#ffe088] shadow-[0_0_18px_rgba(212,175,55,.18)] ${compact ? "px-2 py-1 text-[10px]" : "px-3 py-1 text-xs"}`}>
+        <Crown size={compact ? 13 : 15} /> Certifie
+      </span>
+    );
+  }
+  if (!profile?.is_verified) return null;
 
   return (
-    <div className="mt-3 grid grid-cols-4 gap-2">
-      {photos.slice(0, limit).map((photo, index) => (
-        <div key={photo.id} className="relative aspect-square overflow-hidden rounded-2xl bg-white/10">
+    <span className={`inline-flex items-center gap-1 rounded-full border border-[#d4af37]/30 bg-[#d4af37]/15 font-black text-[#ffe088] ${compact ? "px-2 py-1 text-[10px]" : "px-3 py-1 text-xs"}`}>
+      <BadgeCheck size={compact ? 13 : 15} /> Verifie
+    </span>
+  );
+}
+
+function PhotoLightbox({ photos, index, name, onIndexChange, onClose }: { photos: Photo[]; index: number; name: string; onIndexChange: (index: number) => void; onClose: () => void }) {
+  const current = photos[index];
+  if (!current) return null;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/88 p-2 sm:p-4 backdrop-blur-xl">
+      <button type="button" onClick={onClose} className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 sm:right-4 sm:top-4" aria-label="Fermer l'image">
+        <X size={22} />
+      </button>
+      {photos.length > 1 ? (
+        <button type="button" onClick={() => onIndexChange(index === 0 ? photos.length - 1 : index - 1)} className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 sm:left-4 sm:h-12 sm:w-12" aria-label="Image precedente">
+          <ChevronLeft size={26} />
+        </button>
+      ) : null}
+      <div className="relative h-[78dvh] w-full max-w-5xl overflow-hidden rounded-[22px] border border-white/10 bg-[#100c1a] sm:h-[82dvh] sm:rounded-[28px]">
+        <Image src={current.url} alt={`${name} photo ${index + 1}`} fill sizes="100vw" className="object-contain" priority />
+      </div>
+      {photos.length > 1 ? (
+        <button type="button" onClick={() => onIndexChange((index + 1) % photos.length)} className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 sm:right-4 sm:h-12 sm:w-12" aria-label="Image suivante">
+          <ChevronRight size={26} />
+        </button>
+      ) : null}
+      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white">
+        {index + 1}/{photos.length}
+      </div>
+    </div>
+  );
+}
+
+function ProfilePhotoStrip({ profile, name, limit = PROFILE_PHOTO_LIMIT }: { profile: Profile; name: string; limit?: number }) {
+  const photos = getProfilePhotos(profile);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  if (photos.length === 0) return null;
+  const visiblePhotos = photos.slice(0, limit);
+
+  return (
+    <>
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        {visiblePhotos.map((photo, index) => (
+        <button key={photo.id} type="button" onClick={() => setOpenIndex(index)} className="group relative aspect-square overflow-hidden rounded-2xl bg-white/10">
           <Image src={photo.url} alt={`${name} photo ${index + 1}`} fill sizes="96px" className="object-cover" />
           {photo.is_primary ? <span className="absolute left-1 top-1 rounded-full bg-black/45 px-1.5 py-0.5 text-[9px] font-black text-white">1</span> : null}
-        </div>
-      ))}
-    </div>
+          <span className="absolute inset-0 hidden items-center justify-center bg-black/35 text-white group-hover:flex"><Maximize2 size={18} /></span>
+        </button>
+        ))}
+      </div>
+      {openIndex !== null ? <PhotoLightbox photos={visiblePhotos} index={openIndex} name={name} onIndexChange={setOpenIndex} onClose={() => setOpenIndex(null)} /> : null}
+    </>
   );
 }
 
@@ -92,6 +150,7 @@ export function DiscoveryView() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [index, setIndex] = useState(0);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -116,6 +175,7 @@ export function DiscoveryView() {
       if (res?.match) setNotice("Match cree. Vous pouvez demarrer la conversation.");
     }
     setPhotoIndex(0);
+    setLightboxOpen(false);
     setOverviewOpen(false);
     setIndex((value) => Math.min(value + 1, profiles.length));
   }
@@ -147,52 +207,56 @@ export function DiscoveryView() {
       {!current ? (
         <EmptyState title="Aucun profil en base" body="La decouverte affichera les profils lorsque la base de donnees contiendra des candidats compatibles." action={<Link href="/dashboard/filters"><Button variant="secondary">Ouvrir les filtres</Button></Link>} />
       ) : (
-        <div className="mx-auto grid max-w-5xl gap-6 xl:grid-cols-[1fr_320px]">
-          <article className="relative min-h-[620px] overflow-hidden rounded-[28px] border border-white/10 bg-[#221d2d] shadow-2xl">
+        <div className="mx-auto grid max-w-5xl gap-4 sm:gap-6 xl:grid-cols-[1fr_320px]">
+          <article className="relative min-h-[calc(100dvh-210px)] overflow-hidden rounded-[24px] border border-white/10 bg-[#221d2d] shadow-2xl sm:min-h-[620px] sm:rounded-[28px]">
             {activePhoto ? (
               <Image src={activePhoto} alt={current.first_name} fill sizes="(max-width: 1024px) 100vw, 700px" className="object-cover" priority />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-white/5"><Camera className="text-white/25" size={96} /></div>
             )}
+            {activePhoto ? (
+              <button type="button" onClick={() => setLightboxOpen(true)} className="absolute right-3 top-12 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-md transition hover:bg-black/55 sm:right-4 sm:top-14 sm:h-11 sm:w-11" aria-label="Agrandir l'image">
+                <Maximize2 size={20} />
+              </button>
+            ) : null}
             {currentPhotos.length > 1 ? (
               <>
-                <button type="button" onClick={previousPhoto} className="absolute left-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-md transition hover:bg-black/55" aria-label="Photo precedente">
+                <button type="button" onClick={previousPhoto} className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-md transition hover:bg-black/55 sm:left-4 sm:h-11 sm:w-11" aria-label="Photo precedente">
                   <ChevronLeft size={22} />
                 </button>
-                <button type="button" onClick={nextPhoto} className="absolute right-4 top-1/2 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-md transition hover:bg-black/55" aria-label="Photo suivante">
+                <button type="button" onClick={nextPhoto} className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-md transition hover:bg-black/55 sm:right-4 sm:h-11 sm:w-11" aria-label="Photo suivante">
                   <ChevronRight size={22} />
                 </button>
-                <div className="absolute inset-x-4 top-4 z-10 flex gap-1.5">
+                <div className="absolute inset-x-3 top-3 z-10 flex gap-1.5 sm:inset-x-4 sm:top-4">
                   {currentPhotos.map((photo, idx) => (
                     <button key={photo.id} type="button" onClick={() => setPhotoIndex(idx)} className={`h-1.5 flex-1 rounded-full ${idx === photoIndex ? "bg-white" : "bg-white/35"}`} aria-label={`Afficher photo ${idx + 1}`} />
                   ))}
                 </div>
               </>
             ) : null}
+            {lightboxOpen ? <PhotoLightbox photos={currentPhotos} index={photoIndex} name={current.first_name} onIndexChange={setPhotoIndex} onClose={() => setLightboxOpen(false)} /> : null}
             <div className="absolute inset-0 bg-gradient-to-t from-[#100c1a] via-[#100c1a]/35 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 space-y-5 p-6">
+            <div className="absolute inset-x-0 bottom-0 space-y-3 p-4 sm:space-y-5 sm:p-6">
               <div className="flex flex-wrap gap-2">
                 <span className="glass inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold text-[#ffe088]"><ShieldCheck size={15} /> Communaute universitaire</span>
                 <span className="glass inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold text-[var(--secondary-soft)]"><MapPin size={15} /> Meme zone</span>
+                <VerifiedBadge profile={current} />
               </div>
               <div>
-                <h2 className="flex items-center gap-2 text-4xl font-black tracking-tight text-white">
-                  {current.first_name}, {current.age ?? "18+"}
-                  <ShieldCheck size={24} className="text-[var(--gold)]" />
-                </h2>
+                <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">{current.first_name}, {current.age ?? "18+"}</h2>
                 <p className="mt-2 flex items-center gap-2 text-sm text-[var(--muted)]">
                   <GraduationCap size={17} /> {current.university?.name ?? "Universite non renseignee"} · {current.study_level ?? "Niveau non renseigne"}
                 </p>
-                {current.bio ? <p className="mt-4 max-w-xl text-base leading-7 text-white/90">{current.bio}</p> : null}
+                {current.bio ? <p className="mt-3 line-clamp-3 max-w-xl text-sm leading-6 text-white/90 sm:mt-4 sm:text-base sm:leading-7">{current.bio}</p> : null}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex max-h-20 flex-wrap gap-2 overflow-hidden sm:max-h-none">
                 {(current.interests ?? []).map((interest) => (
                   <span key={interest} className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white">{interest}</span>
                 ))}
               </div>
             </div>
           </article>
-          <aside className="glass flex flex-col justify-between rounded-[28px] p-5">
+          <aside className="glass flex flex-col justify-between rounded-[24px] p-4 sm:rounded-[28px] sm:p-5">
             <div>
               <p className="text-lg font-black text-white">Completion</p>
               <div className="mt-4 rounded-2xl bg-white/8 p-4">
@@ -229,7 +293,7 @@ export function DiscoveryView() {
                 </div>
               ) : null}
             </div>
-            <div className="mt-6 flex items-center justify-center gap-4">
+            <div className="sticky bottom-0 z-10 mt-5 flex items-center justify-center gap-4 rounded-[24px] bg-[#15101f]/75 py-3 backdrop-blur-xl xl:static xl:bg-transparent xl:py-0">
               <button onClick={() => react("skip")} className="glass flex h-14 w-14 items-center justify-center rounded-full text-[var(--muted)]"><X size={26} /></button>
               <button onClick={() => react("super_like")} className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--gold)] text-[#241a00]"><Star size={28} fill="currentColor" /></button>
               <button onClick={() => react("like")} className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--primary)] text-white"><Heart size={26} fill="currentColor" /></button>
@@ -269,10 +333,7 @@ export function FiltersView() {
         </div>
         <Field label="Rayon floute"><TextInput type="number" min={1} max={500} value={form.radius_km ?? ""} onChange={(e) => setForm({ ...form, radius_km: Number(e.target.value) })} /></Field>
         <Notice>Les profils affiches sont automatiquement du sexe oppose: hommes vers femmes, femmes vers hommes.</Notice>
-        <label className="glass flex items-center justify-between rounded-2xl p-4 text-sm font-bold text-white">
-          Meme universite uniquement
-          <input type="checkbox" checked={!!form.same_university_only} onChange={(e) => setForm({ ...form, same_university_only: e.target.checked })} className="h-5 w-5 accent-[#d7263d]" />
-        </label>
+        <Toggle checked={!!form.same_university_only} onChange={(checked) => setForm({ ...form, same_university_only: checked })} label="Meme universite uniquement" />
         <Button type="submit" disabled={loading}>Enregistrer les filtres</Button>
       </form>
     </section>
@@ -318,7 +379,10 @@ export function LikesView() {
                   <div className="absolute left-3 top-3 rounded-full bg-[var(--primary)] px-3 py-1 text-xs font-black text-white">{item.type === "super_like" ? "Super Like" : "Like"}</div>
                 </div>
                 <div className="p-4">
-                  <h2 className="text-xl font-black text-white">{profile?.first_name ?? item.other_user?.name ?? "Profil"}, {profile?.age ?? "18+"}</h2>
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-xl font-black text-white">{profile?.first_name ?? item.other_user?.name ?? "Profil"}, {profile?.age ?? "18+"}</h2>
+                    <VerifiedBadge profile={profile} compact />
+                  </div>
                   <p className="mt-1 text-sm text-[var(--muted)]">{profile?.university?.name ?? "Universite non renseignee"}</p>
                   <div className="mt-3 flex flex-wrap gap-2">{(profile?.interests ?? []).slice(0, 3).map((interest) => <span key={interest} className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">{interest}</span>)}</div>
                   {profile ? <ProfilePhotoStrip profile={profile} name={profile.first_name ?? "Profil"} /> : null}
@@ -374,8 +438,8 @@ export function MatchesView() {
       {matches.length === 0 ? (
         <EmptyState title="Aucun match en base" body="Continuez la decouverte pour creer de nouvelles conversations." action={<Link href="/dashboard/discovery"><Button>Decouvrir</Button></Link>} />
       ) : (
-        <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
-          <aside className="space-y-3">
+        <div className="grid gap-4 sm:gap-5 xl:grid-cols-[360px_1fr]">
+          <aside className="no-scrollbar -mx-3 flex gap-3 overflow-x-auto px-3 pb-1 xl:mx-0 xl:block xl:space-y-3 xl:overflow-visible xl:px-0 xl:pb-0">
             {matches.map((match) => {
               const itemProfile = match.matched_user?.profile;
               const photo = itemProfile ? getPrimaryPhoto(itemProfile) : null;
@@ -384,13 +448,16 @@ export function MatchesView() {
                   key={match.id}
                   type="button"
                   onClick={() => setActive(match)}
-                  className={`flex w-full gap-3 rounded-[24px] border p-3 text-left transition ${active?.id === match.id ? "border-[var(--primary)] bg-white/10" : "border-white/10 bg-white/[0.04] hover:bg-white/8"}`}
+                  className={`flex min-w-[260px] gap-3 rounded-[24px] border p-3 text-left transition xl:w-full xl:min-w-0 ${active?.id === match.id ? "border-[var(--primary)] bg-white/10" : "border-white/10 bg-white/[0.04] hover:bg-white/8"}`}
                 >
                   <span className="relative h-20 w-16 shrink-0 overflow-hidden rounded-2xl bg-white/10">
                     {photo ? <Image src={photo} alt={itemProfile?.first_name ?? "Match"} fill sizes="64px" className="object-cover" /> : <span className="flex h-full items-center justify-center"><Camera className="text-white/25" /></span>}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <b className="block truncate text-white">{itemProfile?.first_name ?? match.matched_user?.name ?? "Profil"}</b>
+                    <span className="flex items-center gap-2">
+                      <b className="block truncate text-white">{itemProfile?.first_name ?? match.matched_user?.name ?? "Profil"}</b>
+                      <VerifiedBadge profile={itemProfile} compact />
+                    </span>
                     <small className="mt-1 block truncate text-[var(--muted)]">{itemProfile?.university?.name ?? "Universite non renseignee"}</small>
                     <span className="mt-2 inline-flex rounded-full bg-[#22c55e]/10 px-2 py-1 text-xs font-bold text-[#bbf7d0]">
                       {match.compatibility?.score ?? 55}% compatible
@@ -406,15 +473,16 @@ export function MatchesView() {
               <EmptyState title="Profil match introuvable" body="Le match existe mais le profil associe n'a pas ete retourne par l'API." />
             ) : (
               <div className="grid gap-0 lg:grid-cols-[0.85fr_1.15fr]">
-                <div className="relative min-h-[520px] bg-white/5">
+                <div className="relative min-h-[430px] bg-white/5 sm:min-h-[520px]">
                   {primaryPhoto ? <Image src={primaryPhoto} alt={profile.first_name} fill sizes="(max-width: 1024px) 100vw, 420px" className="object-cover" /> : <div className="absolute inset-0 flex items-center justify-center"><Camera className="text-white/25" size={76} /></div>}
                   <div className="absolute inset-0 bg-gradient-to-t from-[#100c1a] via-transparent to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-5">
                     <div className="flex flex-wrap gap-2">
                       <span className="glass rounded-full px-3 py-1 text-xs font-bold text-[#ffe088]"><ShieldCheck size={14} className="inline" /> Match confirme</span>
                       {active.compatibility?.same_university ? <span className="glass rounded-full px-3 py-1 text-xs font-bold text-[var(--secondary-soft)]">Meme universite</span> : null}
+                      <VerifiedBadge profile={profile} />
                     </div>
-                    <h2 className="mt-4 text-4xl font-black text-white">{profile.first_name}, {profile.age ?? "18+"}</h2>
+                    <h2 className="mt-4 text-3xl font-black text-white sm:text-4xl">{profile.first_name}, {profile.age ?? "18+"}</h2>
                     <p className="mt-2 text-sm text-[var(--muted)]">{profile.university?.name ?? "Universite non renseignee"} · {profile.study_level ?? "Niveau non renseigne"}</p>
                   </div>
                 </div>
@@ -437,17 +505,14 @@ export function MatchesView() {
                     <h3 className="font-black text-white">Centres d&apos;interet</h3>
                     <div className="mt-3 flex flex-wrap gap-2">{(profile.interests ?? []).map((item) => <span key={item} className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-white">{item}</span>)}</div>
                     {(active.compatibility?.shared_interests ?? []).length ? <p className="mt-3 text-xs text-[#bbf7d0]">{active.compatibility?.shared_interests?.join(", ")} en commun.</p> : null}
-                    <ProfilePhotoStrip profile={profile} name={profile.first_name} limit={8} />
                   </section>
                   {photos.length > 1 ? (
                     <section>
                       <h3 className="font-black text-white">Galerie</h3>
-                      <div className="mt-3 grid grid-cols-4 gap-2">
-                        {photos.slice(0, 8).map((photo) => <div key={photo.id} className="relative aspect-square overflow-hidden rounded-2xl bg-white/10"><Image src={photo.url} alt={profile.first_name} fill sizes="80px" className="object-cover" /></div>)}
-                      </div>
+                      <ProfilePhotoStrip profile={profile} name={profile.first_name} />
                     </section>
                   ) : null}
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2 [&_a]:w-full [&_button]:w-full">
                     <Link href={`/dashboard/messages?conversation=${active.conversation?.id ?? ""}`}><Button className="w-full"><MessageCircle size={18} /> Envoyer un message</Button></Link>
                     <Button type="button" variant="danger" onClick={() => closeMatch(active)}><X size={18} /> Fermer le match</Button>
                   </div>
@@ -533,8 +598,10 @@ export function MessagesView() {
         const requestedId = Number(searchParams.get("conversation"));
         const requested = list.find((conversation) => conversation.id === requestedId);
         setConversations(list);
-        if (requested ?? list[0]) setMessageLoading(true);
-        setActive(requested ?? list[0] ?? null);
+        const shouldAutoOpen = typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
+        const nextActive = requested ?? (shouldAutoOpen ? list[0] : null) ?? null;
+        if (nextActive) setMessageLoading(true);
+        setActive(nextActive);
       })
       .catch((err) => setNotice(errorMessage(err)))
       .finally(() => setLoading(false));
@@ -616,7 +683,7 @@ export function MessagesView() {
       </div>
       {notice ? <div className="mb-4"><Notice kind="error">{notice}</Notice></div> : null}
       {conversations.length === 0 ? <EmptyState title="Aucune conversation en base" body="Les conversations apparaissent apres un match mutuel." /> : (
-        <div className="grid h-[calc(100dvh-150px)] min-h-[500px] overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.04] sm:h-[calc(100vh-150px)] sm:min-h-[560px] sm:rounded-[28px] lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+        <div className="grid h-[calc(100dvh-128px)] min-h-[480px] overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.04] sm:h-[calc(100vh-150px)] sm:min-h-[560px] sm:rounded-[28px] lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
           <aside className={`${active ? "hidden lg:block" : "block"} min-w-0 overflow-y-auto border-b border-white/10 p-2 sm:p-3 lg:border-b-0 lg:border-r`}>
             {conversations.map((conversation) => {
               const profile = conversation.matched_user?.profile;
@@ -627,7 +694,10 @@ export function MessagesView() {
                   {photo ? <Image src={photo} alt={profile?.first_name ?? "Conversation"} fill sizes="48px" className="object-cover" /> : <span className="flex h-full items-center justify-center"><MessageCircle size={18} /></span>}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <b className="block truncate text-sm text-white">{profile?.first_name ?? conversation.matched_user?.name ?? "Conversation"}</b>
+                  <span className="flex items-center gap-2">
+                    <b className="block truncate text-sm text-white">{profile?.first_name ?? conversation.matched_user?.name ?? "Conversation"}</b>
+                    <VerifiedBadge profile={profile} compact />
+                  </span>
                   <small className="block truncate text-[var(--muted)]">{conversation.latest_message ? getMessagePreview(conversation.latest_message) : "Aucun message"}</small>
                 </span>
                 {(conversation.unread_count ?? 0) > 0 ? <span className="rounded-full bg-[var(--primary)] px-2 py-1 text-xs font-black text-white">{conversation.unread_count}</span> : null}
@@ -638,7 +708,10 @@ export function MessagesView() {
             <div className="flex items-center gap-3 border-b border-white/10 p-3 sm:p-4">
               <button type="button" onClick={() => setActive(null)} className="glass flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white lg:hidden" aria-label="Retour aux conversations"><ArrowLeft size={18} /></button>
               <div className="min-w-0">
-                <p className="truncate font-bold text-white">{active?.matched_user?.profile?.first_name ?? active?.matched_user?.name ?? "Conversation active"}</p>
+                <div className="flex items-center gap-2">
+                  <p className="truncate font-bold text-white">{active?.matched_user?.profile?.first_name ?? active?.matched_user?.name ?? "Conversation active"}</p>
+                  <VerifiedBadge profile={active?.matched_user?.profile} compact />
+                </div>
                 <p className="truncate text-xs text-[var(--muted)]">Free: 15 messages. Premium: illimite.</p>
               </div>
             </div>
@@ -755,6 +828,7 @@ export function MessagesView() {
 
 export function NotificationsView() {
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const [category, setCategory] = useState("all");
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   useEffect(() => {
@@ -773,13 +847,29 @@ export function NotificationsView() {
   }
 
   if (loading) return <NotificationsSkeleton />;
+  const unread = items.filter((item) => !item.read_at).length;
+  const categories = ["all", ...Array.from(new Set(items.map((item) => item.category)))];
+  const visibleItems = category === "all" ? items : items.filter((item) => item.category === category);
   return (
     <section>
-      <PageHeader title="Notifications" body="Matches, messages, premium et securite en un seul flux." action={<Button variant="secondary" onClick={readAll}><Check size={18} /> Tout lire</Button>} />
+      <PageHeader title="Centre de notifications" body="Toutes les alertes importantes du dashboard, avec liens directs vers l'action." action={<Button variant="secondary" onClick={readAll}><Check size={18} /> Tout lire</Button>} />
       {notice ? <div className="mb-4"><Notice kind="error">{notice}</Notice></div> : null}
-      {items.length === 0 ? <EmptyState title="Aucune notification en base" body="Votre flux apparaitra ici lorsqu'une action sera creee par le backend." /> : (
+      <div className="mb-4 grid gap-3 sm:grid-cols-[220px_1fr]">
+        <div className="glass rounded-[22px] p-4">
+          <p className="text-xs font-black uppercase tracking-[0.05em] text-[var(--muted)]">Non lues</p>
+          <p className="mt-2 text-3xl font-black text-white">{unread}</p>
+        </div>
+        <div className="glass flex flex-wrap items-center gap-2 rounded-[22px] p-3">
+          {categories.map((item) => (
+            <button key={item} type="button" onClick={() => setCategory(item)} className={`rounded-full px-3 py-2 text-xs font-black transition ${category === item ? "bg-[var(--primary)] text-white" : "bg-white/8 text-[var(--muted)] hover:bg-white/12 hover:text-white"}`}>
+              {item === "all" ? "Toutes" : item}
+            </button>
+          ))}
+        </div>
+      </div>
+      {visibleItems.length === 0 ? <EmptyState title="Aucune notification en base" body="Votre flux apparaitra ici lorsqu'une action sera creee par le backend." /> : (
         <div className="space-y-3">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <Link href={item.action_url ?? "/dashboard/notifications"} onClick={() => openNotification(item)} key={item.id} className="glass flex gap-4 rounded-[22px] p-4 transition hover:bg-white/10">
               <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${item.read_at ? "bg-white/10" : "bg-[var(--primary)]"}`}><Bell size={18} /></span>
               <div className="flex-1"><p className="font-bold text-white">{item.title}</p><p className="mt-1 text-sm text-[var(--muted)]">{item.body}</p><p className="mt-2 text-xs text-[var(--gold)]">Ouvrir l&apos;action</p></div>
@@ -800,6 +890,7 @@ export function ProfileView() {
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [savingPhoto, setSavingPhoto] = useState(false);
+  const [profileLightboxIndex, setProfileLightboxIndex] = useState<number | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -812,7 +903,14 @@ export function ProfileView() {
 
   function choosePhotos(files: FileList | null) {
     photoPreviews.forEach((preview) => URL.revokeObjectURL(preview));
-    const images = Array.from(files ?? []).slice(0, 6);
+    const availableSlots = Math.max(0, PROFILE_PHOTO_LIMIT - (profile?.photos?.length ?? 0));
+    if (availableSlots === 0) {
+      setSelectedPhotos([]);
+      setPhotoPreviews([]);
+      setMessage(`Votre galerie contient deja ${PROFILE_PHOTO_LIMIT} photos.`);
+      return;
+    }
+    const images = Array.from(files ?? []).slice(0, availableSlots);
     setSelectedPhotos(images);
     setPhotoPreviews(images.map((file) => URL.createObjectURL(file)));
   }
@@ -855,8 +953,13 @@ export function ProfileView() {
 
   async function addPhoto() {
     if (!profile) return;
+    const currentPhotos = getProfilePhotos(profile);
     if (selectedPhotos.length === 0) {
       setMessage("Choisissez au moins une photo depuis votre appareil avant de continuer.");
+      return;
+    }
+    if (currentPhotos.length + selectedPhotos.length > PROFILE_PHOTO_LIMIT) {
+      setMessage(`Votre galerie est limitee a ${PROFILE_PHOTO_LIMIT} photos.`);
       return;
     }
     setSavingPhoto(true);
@@ -883,6 +986,13 @@ export function ProfileView() {
       <PageHeader title="Profil" body="Completez les informations visibles dans la decouverte." action={<Button variant="secondary" onClick={locate}><Navigation size={18} /> Actualiser la zone</Button>} />
       <form onSubmit={submit} className="grid gap-5 lg:grid-cols-[320px_1fr]">
         <aside className="glass rounded-[28px] p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.05em] text-[var(--muted)]">Statut profil</p>
+              <p className="mt-1 font-black text-white">{profile.first_name}</p>
+            </div>
+            <VerifiedBadge profile={profile} />
+          </div>
           <div className="relative aspect-[3/4] overflow-hidden rounded-[24px] bg-white/10">
             {photoPreviews[0] ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -901,18 +1011,20 @@ export function ProfileView() {
             <div className="mt-4 rounded-[22px] border border-white/10 bg-white/5 p-3">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-black uppercase tracking-[0.05em] text-[var(--gold)]">Galerie</p>
-                <span className="text-xs font-bold text-[var(--muted)]">{profilePhotos.length}/6 photos</span>
+                <span className="text-xs font-bold text-[var(--muted)]">{profilePhotos.length}/{PROFILE_PHOTO_LIMIT} photos</span>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {profilePhotos.map((photo, index) => (
-                  <div key={photo.id} className="relative aspect-square overflow-hidden rounded-2xl bg-white/10">
+                  <button key={photo.id} type="button" onClick={() => setProfileLightboxIndex(index)} className="group relative aspect-square overflow-hidden rounded-2xl bg-white/10">
                     <Image src={photo.url} alt={`${profile.first_name} photo ${index + 1}`} fill sizes="96px" className="object-cover" />
+                    <span className="absolute inset-0 hidden items-center justify-center bg-black/35 text-white group-hover:flex"><Maximize2 size={18} /></span>
                     {photo.is_primary ? <span className="absolute left-1 top-1 rounded-full bg-[var(--primary)] px-1.5 py-0.5 text-[9px] font-black text-white">Principale</span> : null}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
           ) : null}
+          {profileLightboxIndex !== null ? <PhotoLightbox photos={profilePhotos} index={profileLightboxIndex} name={profile.first_name} onIndexChange={setProfileLightboxIndex} onClose={() => setProfileLightboxIndex(null)} /> : null}
           {profilePhotos.length < 2 ? <div className="mt-3"><Notice kind="error">Ajoutez au moins 2 photos pour un profil complet.</Notice></div> : null}
           <Field label="Photos locales" icon={<Camera size={18} />}>
             <TextInput type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => choosePhotos(e.target.files)} />
@@ -1032,8 +1144,10 @@ export function SettingsView() {
     { title: "Notifications", body: "Push, messages, matchs et alertes de securite.", href: "/dashboard/notifications", icon: Bell },
     { title: "Paiement", body: "Plans Premium, Mobile Money et historique de paiement.", href: "/dashboard/premium", icon: Crown },
     { title: "Verification", body: "Selfie, documents et badge de confiance.", href: "/dashboard/verification", icon: ShieldCheck },
+    { title: "Certification", body: "Badge dore, score de confiance et validation finale.", href: "/dashboard/certified", icon: Crown },
     { title: "Support", body: "Aide, contact et signalements.", href: "/dashboard/support/contact", icon: MessageCircle },
     { title: "Reglages premium", body: "Mode invisible et options reservees aux abonnes.", href: "/dashboard/settings/premium", icon: Star },
+    { title: "Personnalisation", body: "Affichage du dashboard, densite, badges et animations.", href: "/dashboard/settings/personalize", icon: SlidersHorizontal },
   ];
 
   return (
@@ -1051,10 +1165,9 @@ export function SettingsView() {
               <Field label="Age max"><TextInput type="number" min={18} value={preferences.max_age ?? ""} onChange={(e) => setPreferences({ ...preferences, max_age: Number(e.target.value) })} /></Field>
               <Field label="Rayon km"><TextInput type="number" min={1} max={500} value={preferences.radius_km ?? ""} onChange={(e) => setPreferences({ ...preferences, radius_km: Number(e.target.value) })} /></Field>
             </div>
-            <label className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 text-sm font-bold text-white">
-              Meme universite uniquement
-              <input type="checkbox" checked={!!preferences.same_university_only} onChange={(e) => setPreferences({ ...preferences, same_university_only: e.target.checked })} className="h-5 w-5 accent-[#d7263d]" />
-            </label>
+            <div className="mt-4">
+              <Toggle checked={!!preferences.same_university_only} onChange={(checked) => setPreferences({ ...preferences, same_university_only: checked })} label="Meme universite uniquement" />
+            </div>
             <Button className="mt-5" onClick={updateDiscoveryPreferences} disabled={loading}>Enregistrer les preferences</Button>
           </section>
 
@@ -1090,6 +1203,105 @@ export function SettingsView() {
           </div>
         </aside>
       </div>
+    </section>
+  );
+}
+
+export function DashboardPersonalizationView() {
+  const [settings, setSettings] = useState(() => {
+    const defaults = {
+      compactMode: false,
+      animatedCharts: true,
+      showProfileBadges: true,
+      showCounters: true,
+      quietNotifications: false,
+    };
+    if (typeof window === "undefined") return defaults;
+    const raw = localStorage.getItem("us_dashboard_personalization");
+    return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
+  });
+  const [message, setMessage] = useState("");
+
+  function update(key: keyof typeof settings, value: boolean) {
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    localStorage.setItem("us_dashboard_personalization", JSON.stringify(next));
+    setMessage("Preferences personnalisees enregistrees sur ce navigateur.");
+  }
+
+  return (
+    <section>
+      <PageHeader title="Personnalisation" body="Ajustez l'experience du dashboard pour votre maniere de travailler." />
+      {message ? <div className="mb-4"><Notice kind="success">{message}</Notice></div> : null}
+      <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
+        <section className="glass rounded-[28px] p-5">
+          <h2 className="text-xl font-black text-white">Affichage du dashboard</h2>
+          <div className="mt-5 space-y-3">
+            <Toggle checked={settings.compactMode} onChange={(checked) => update("compactMode", checked)} label="Mode compact pour afficher plus de donnees" />
+            <Toggle checked={settings.animatedCharts} onChange={(checked) => update("animatedCharts", checked)} label="Graphiques animes dans les vues statistiques" />
+            <Toggle checked={settings.showProfileBadges} onChange={(checked) => update("showProfileBadges", checked)} label="Afficher les badges Verifie et Certifie" />
+            <Toggle checked={settings.showCounters} onChange={(checked) => update("showCounters", checked)} label="Afficher les compteurs messages et notifications" />
+            <Toggle checked={settings.quietNotifications} onChange={(checked) => update("quietNotifications", checked)} label="Mode discret pour les notifications visuelles" />
+          </div>
+        </section>
+        <aside className="glass h-max rounded-[28px] p-5">
+          <SlidersHorizontal className="text-[var(--gold)]" size={28} />
+          <h2 className="mt-4 text-xl font-black text-white">Profil d&apos;affichage</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Ces reglages sont gardes localement pour ce navigateur et peuvent etre synchronises plus tard avec l&apos;API.</p>
+          <Link href="/dashboard/settings" className="mt-5 inline-flex"><Button variant="secondary">Retour parametres</Button></Link>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+export function CertifiedProfileView() {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.profile().then(setProfile).catch((err) => setNotice(errorMessage(err))).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ProfileSkeleton />;
+
+  const score = profile?.certification_score ?? 0;
+  return (
+    <section>
+      <PageHeader title="Certification" body="Suivez votre progression vers le badge certifie dore." />
+      {notice ? <Notice kind="error">{notice}</Notice> : null}
+      {!profile ? <EmptyState title="Profil introuvable" body="Impossible de charger le statut de certification." /> : (
+        <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
+          <article className="glass rounded-[28px] p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="flex flex-wrap gap-2">
+                  <VerifiedBadge profile={profile} />
+                  <span className="rounded-full bg-white/8 px-3 py-1 text-xs font-black text-[var(--muted)]">{profile.certification_status ?? "not_eligible"}</span>
+                </div>
+                <h1 className="mt-5 text-3xl font-black text-white">{profile.first_name}</h1>
+                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">A 100%, votre profil devient eligible pour l&apos;activation du badge dore.</p>
+              </div>
+              <div className="text-center">
+                <p className="text-5xl font-black text-white">{score}%</p>
+                <p className="mt-1 text-xs font-bold uppercase tracking-[0.05em] text-[var(--muted)]">Score</p>
+              </div>
+            </div>
+            <div className="mt-6 h-3 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-[#d4af37]" style={{ width: `${score}%` }} />
+            </div>
+          </article>
+          <aside className="glass h-max rounded-[28px] p-5">
+            <Crown className="text-[var(--gold)]" size={32} />
+            <h2 className="mt-4 text-xl font-black text-white">Badge dore</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              {profile.is_certified ? "Votre badge certifie est actif sur les pages profil, matches, likes et messages." : score >= 100 ? "Votre profil est eligible et attend la validation finale." : "Completez votre profil, verifiez votre compte et interagissez sainement pour atteindre 100%."}
+            </p>
+            <Link href="/dashboard/verification" className="mt-5 inline-flex"><Button variant="secondary">Voir verification</Button></Link>
+          </aside>
+        </div>
+      )}
     </section>
   );
 }

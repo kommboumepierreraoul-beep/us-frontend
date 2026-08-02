@@ -2,6 +2,14 @@
 
 import type {
   ApiEnvelope,
+  AdminMessageRow,
+  AdminEventRow,
+  AdminOverview,
+  AdminPaymentRow,
+  AdminReportRow,
+  AdminSupportTicketRow,
+  AdminUserRow,
+  AdminVerificationRow,
   AuthResponse,
   Conversation,
   DiscoveryPreference,
@@ -15,6 +23,7 @@ import type {
   Plan,
   Profile,
   Photo,
+  SupportTicket,
   University,
   User,
   VerificationRequest,
@@ -244,4 +253,31 @@ export const api = {
       body: { plan_id, phone },
       idempotencyKey: crypto.randomUUID(),
     }),
+  supportTickets: () => request<Paginated<SupportTicket>>("/v1/support/tickets"),
+  createSupportTicket: (body: FormData) =>
+    request<SupportTicket>("/v1/support/tickets", { method: "POST", body }),
+  adminOverview: () => request<AdminOverview>("/v1/admin/overview"),
+  adminUsers: (query = "") => request<Paginated<AdminUserRow>>(`/v1/admin/users${query ? `?${query}` : ""}`),
+  adminUser: (id: number) => request<AdminUserRow>(`/v1/admin/users/${id}`),
+  adminUpdateUserStatus: (id: number, body: { status: "active" | "paused" | "suspended" | "banned"; reason?: string }) =>
+    request<AdminUserRow>(`/v1/admin/users/${id}/status`, { method: "PATCH", body }),
+  adminReports: (query = "") => request<Paginated<AdminReportRow>>(`/v1/admin/reports${query ? `?${query}` : ""}`),
+  adminUpdateReport: (id: number, body: { status: "open" | "reviewing" | "resolved" | "dismissed"; priority?: number; reason?: string }) =>
+    request<AdminReportRow>(`/v1/admin/reports/${id}`, { method: "PATCH", body }),
+  adminPayments: (query = "") => request<Paginated<AdminPaymentRow>>(`/v1/admin/payments${query ? `?${query}` : ""}`),
+  adminMessages: (query = "") => request<Paginated<AdminMessageRow>>(`/v1/admin/messages${query ? `?${query}` : ""}`),
+  adminEvents: (query = "") => request<Paginated<AdminEventRow>>(`/v1/admin/events${query ? `?${query}` : ""}`),
+  adminCreateEvent: (body: Partial<AdminEventRow> | FormData) =>
+    request<AdminEventRow>("/v1/admin/events", { method: "POST", body }),
+  adminUpdateEvent: (id: number, body: Partial<AdminEventRow> | FormData) =>
+    request<AdminEventRow>(`/v1/admin/events/${id}`, { method: body instanceof FormData ? "POST" : "PATCH", body }),
+  adminVerifications: (query = "") => request<Paginated<AdminVerificationRow>>(`/v1/admin/verifications${query ? `?${query}` : ""}`),
+  adminUpdateVerification: (id: number, body: { status: "approved" | "rejected"; rejection_reason?: string }) =>
+    request<AdminVerificationRow>(`/v1/admin/verifications/${id}`, { method: "PATCH", body }),
+  adminCertifications: (query = "") => request<Paginated<AdminUserRow>>(`/v1/admin/certifications${query ? `?${query}` : ""}`),
+  adminCertifyUser: (id: number, reason?: string) =>
+    request<AdminUserRow>(`/v1/admin/users/${id}/certify`, { method: "POST", body: { reason } }),
+  adminSupportTickets: (query = "") => request<Paginated<AdminSupportTicketRow>>(`/v1/admin/support${query ? `?${query}` : ""}`),
+  adminUpdateSupportTicket: (id: number, body: { status?: string; priority?: string; admin_note?: string }) =>
+    request<AdminSupportTicketRow>(`/v1/admin/support/${id}`, { method: "PATCH", body }),
 };

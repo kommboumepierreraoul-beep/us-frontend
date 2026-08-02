@@ -18,6 +18,7 @@ import {
   LifeBuoy,
   Lock,
   Mail,
+  MessageSquare,
   MapPin,
   MessageSquareWarning,
   RefreshCw,
@@ -31,11 +32,11 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { BrandMark } from "@/components/ui/brand";
-import { Badge, Button, EmptyState, Field, Notice, Spinner, TextArea, TextInput } from "@/components/ui/primitives";
+import { Badge, Button, EmptyState, Field, Notice, Select, Spinner, TextArea, TextInput } from "@/components/ui/primitives";
 import { api, ApiError } from "@/services/api";
-import type { University } from "@/types/api";
+import type { SupportTicket, University } from "@/types/api";
 
 function errorMessage(error: unknown) {
   if (error instanceof ApiError) return error.message;
@@ -308,6 +309,97 @@ const flowCopy: Record<string, { title: string; body: string; icon: LucideIcon }
   done: { title: "Onboarding termine", body: "Votre experience US est prete.", icon: CheckCircle2 },
 };
 
+function SupportCenterPage() {
+  const router = useRouter();
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [form, setForm] = useState({ subject: "", category: "general", priority: "normal", message: "" });
+  const [attachment, setAttachment] = useState<File | null>(null);
+
+  useEffect(() => {
+    api.supportTickets().then((res) => setTickets(res.data)).catch((err) => setNotice(errorMessage(err))).finally(() => setLoading(false));
+  }, []);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSending(true);
+    setNotice("");
+    const body = new FormData();
+    body.set("subject", form.subject);
+    body.set("category", form.category);
+    body.set("priority", form.priority);
+    body.set("message", form.message);
+    if (attachment) body.set("attachment", attachment);
+    const ticket = await api.createSupportTicket(body).catch((err) => {
+      setNotice(errorMessage(err));
+      return null;
+    });
+    if (ticket) {
+      setTickets((current) => [ticket, ...current]);
+      setForm({ subject: "", category: "general", priority: "normal", message: "" });
+      setAttachment(null);
+      setNotice("Votre demande support a ete envoyee.");
+    }
+    setSending(false);
+  }
+
+  return (
+    <section className="mx-auto max-w-6xl px-5 py-8">
+      <button type="button" onClick={() => router.back()} className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-[var(--muted)]"><ArrowLeft size={16} /> Retour</button>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <form onSubmit={submit} className="glass rounded-[28px] p-6">
+          <Badge tone="primary">Support</Badge>
+          <h1 className="mt-5 text-3xl font-black text-white">Contacter l&apos;equipe US</h1>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Envoyez une demande precise. Les reponses et changements de statut arriveront dans vos notifications.</p>
+          {notice ? <div className="mt-4"><Notice kind={notice.includes("envoyee") ? "success" : "error"}>{notice}</Notice></div> : null}
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <Field label="Objet"><TextInput value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} required /></Field>
+            <Field label="Categorie">
+              <Select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
+                <option value="general">General</option>
+                <option value="account">Compte</option>
+                <option value="payment">Paiement</option>
+                <option value="safety">Securite</option>
+                <option value="verification">Verification</option>
+                <option value="bug">Bug</option>
+              </Select>
+            </Field>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-[180px_1fr]">
+            <Field label="Priorite">
+              <Select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}>
+                <option value="low">Basse</option>
+                <option value="normal">Normale</option>
+                <option value="high">Haute</option>
+                <option value="urgent">Urgente</option>
+              </Select>
+            </Field>
+            <Field label="Piece jointe"><TextInput type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} /></Field>
+          </div>
+          <Field label="Message"><TextArea value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} required placeholder="Expliquez le probleme, le contexte et l'action attendue." /></Field>
+          <Button type="submit" disabled={sending}>{sending ? "Envoi..." : <><MessageSquare size={18} /> Envoyer au support</>}</Button>
+        </form>
+
+        <aside className="glass h-max rounded-[28px] p-5">
+          <h2 className="text-xl font-black text-white">Mes tickets</h2>
+          <p className="mt-2 text-sm text-[var(--muted)]">Suivi de vos demandes recentes.</p>
+          <div className="mt-5 space-y-3">
+            {loading ? <Spinner /> : tickets.length === 0 ? <EmptyState title="Aucun ticket" body="Vos demandes apparaitront ici." /> : tickets.slice(0, 6).map((ticket) => (
+              <article key={ticket.id} className="rounded-2xl bg-white/5 p-4">
+                <div className="flex flex-wrap gap-2"><Badge tone={ticket.status === "resolved" ? "success" : ticket.status === "closed" ? "neutral" : "gold"}>{ticket.status}</Badge><Badge tone="primary">{ticket.category}</Badge></div>
+                <h3 className="mt-3 font-black text-white">{ticket.subject}</h3>
+                <p className="mt-1 line-clamp-2 text-sm text-[var(--muted)]">{ticket.message}</p>
+              </article>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 export function GenericFlowPage({ family }: { family: "onboarding" | "verification" | "settings" | "safety" | "support" }) {
   const params = useParams<{ step?: string; section?: string }>();
   const slug = params.step ?? params.section ?? "summary";
@@ -318,6 +410,8 @@ export function GenericFlowPage({ family }: { family: "onboarding" | "verificati
   };
   const Icon = data.icon;
   const router = useRouter();
+
+  if (family === "support") return <SupportCenterPage />;
 
   return (
     <section className="mx-auto max-w-3xl px-5 py-8">

@@ -152,10 +152,18 @@ export function ProgressBar({ value }: { value: number }) {
 
 export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
   return (
-    <label className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 text-sm font-bold text-white">
-      {label}
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 accent-[#d7263d]" />
-    </label>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-left text-sm font-bold text-white transition hover:bg-white/10"
+    >
+      <span>{label}</span>
+      <span className={`relative h-7 w-12 shrink-0 rounded-full border transition ${checked ? "border-[#d4af37]/60 bg-[#d4af37]/25" : "border-white/15 bg-white/10"}`}>
+        <span className={`absolute top-1 h-5 w-5 rounded-full transition ${checked ? "left-6 bg-[#d4af37]" : "left-1 bg-white/70"}`} />
+      </span>
+    </button>
   );
 }
 

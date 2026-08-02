@@ -21,10 +21,10 @@ export function DiscoverySkeleton() {
   return (
     <section>
       <PageHeaderSkeleton withAction />
-      <div className="mx-auto grid max-w-5xl gap-6 xl:grid-cols-[1fr_320px]">
-        <div className="relative min-h-[620px] overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] p-6">
-          <Pulse className="absolute inset-0 h-full w-full rounded-[28px]" />
-          <div className="absolute inset-x-6 bottom-6 space-y-4">
+      <div className="mx-auto grid max-w-5xl gap-4 sm:gap-6 xl:grid-cols-[1fr_320px]">
+        <div className="relative min-h-[calc(100dvh-210px)] overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.04] p-4 sm:min-h-[620px] sm:rounded-[28px] sm:p-6">
+          <Pulse className="absolute inset-0 h-full w-full rounded-[24px] sm:rounded-[28px]" />
+          <div className="absolute inset-x-4 bottom-4 space-y-3 sm:inset-x-6 sm:bottom-6 sm:space-y-4">
             <div className="flex gap-2">
               <Pulse className="h-8 w-40 rounded-full" />
               <Pulse className="h-8 w-28 rounded-full" />
@@ -122,7 +122,7 @@ export function MessagesSkeleton() {
       <div className="hidden sm:block">
         <PageHeaderSkeleton />
       </div>
-      <div className="grid h-[calc(100dvh-150px)] min-h-[500px] overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.04] sm:h-[calc(100vh-150px)] sm:min-h-[560px] sm:rounded-[28px] lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+      <div className="grid h-[calc(100dvh-128px)] min-h-[480px] overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.04] sm:h-[calc(100vh-150px)] sm:min-h-[560px] sm:rounded-[28px] lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
         <aside className="border-b border-white/10 p-2 sm:p-3 lg:border-b-0 lg:border-r">
           {Array.from({ length: 7 }).map((_, index) => (
             <div key={index} className="mb-2 flex items-center gap-3 rounded-2xl p-3">

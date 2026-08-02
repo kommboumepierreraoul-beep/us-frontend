@@ -32,6 +32,7 @@ declare global {
 
 const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 let googleScriptPromise: Promise<void> | null = null;
+const PROFILE_PHOTO_LIMIT = 10;
 
 const interestOptions: Array<{ value: string; label: string; icon: LucideIcon }> = [
   { value: "musique", label: "Musique", icon: Music },
@@ -302,7 +303,7 @@ export function RegisterView() {
 
   function choosePhotos(files: FileList | null) {
     photoPreviews.forEach((preview) => URL.revokeObjectURL(preview));
-    const images = Array.from(files ?? []).slice(0, 6);
+    const images = Array.from(files ?? []).slice(0, PROFILE_PHOTO_LIMIT);
     setSelectedPhotos(images);
     setPhotoPreviews(images.map((file) => URL.createObjectURL(file)));
   }
@@ -683,7 +684,7 @@ export function RegisterView() {
                 onChange={(e) => choosePhotos(e.target.files)}
               />
             </Field>
-            <p className="text-xs leading-5 text-[var(--muted)]">{selectedPhotos.length}/6 selectionnees. Minimum requis: 2 photos. La premiere sera la photo principale.</p>
+            <p className="text-xs leading-5 text-[var(--muted)]">{selectedPhotos.length}/{PROFILE_PHOTO_LIMIT} selectionnees. Minimum requis: 2 photos. La premiere sera la photo principale.</p>
           </>
         ) : null}
 
